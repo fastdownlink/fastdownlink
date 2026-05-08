@@ -1,0 +1,39 @@
+{
+    "name": "RPM Fast Downlink",
+    "short_name": "RPM Downlink",
+    "description": "Configures and times an RPM fast downlink transmission. Works offline.",
+    "id": "/rpm-fast-downlink/",
+    "start_url": "./?utm_source=pwa",
+    "scope": "./",
+    "display": "standalone",
+    "display_override": ["standalone", "fullscreen"],
+    "orientation": "portrait",
+    "background_color": "#0b1220",
+    "theme_color": "#0b1220",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

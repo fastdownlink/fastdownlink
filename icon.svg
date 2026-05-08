@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="96" fill="#0b1220"/>
+    <g fill="none" stroke="#4f8cff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="56,300 120,300 120,180 200,180 200,300 280,300 280,180 360,180 360,300 456,300"/>
+    </g>
+    <text x="256" y="420" text-anchor="middle"
+          font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+          font-size="78" font-weight="700" fill="#e7ecf5" letter-spacing="2">RPM</text>
+</svg>

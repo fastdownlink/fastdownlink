@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RPM Downlink" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+    <title>RPM Fast Downlink</title>
+    <style>
+        :root {
+            --bg: #0b1220;
+            --bg-2: #111a2e;
+            --card: #16213a;
+            --text: #e7ecf5;
+            --muted: #9aa6bf;
+            --accent: #4f8cff;
+            --accent-2: #6aa8ff;
+            --danger: #ff6b6b;
+            --ok: #34c759;
+            --border: #243456;
+            --hi-bg: #c0392b;   /* red for HIGH level transmission */
+            --lo-bg: #1f4e8c;   /* blue for LOW level transmission */
+            --radius: 14px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow-x: hidden;
+            touch-action: manipulation;
+            transition: background-color 0.25s ease;
+        }
+
+        body {
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+
+        body.level-h { background: var(--hi-bg); }
+        body.level-l { background: var(--lo-bg); }
+
+        .app {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        header.top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 4px 16px;
+        }
+
+        header.top h1 {
+            font-size: 20px;
+            margin: 0;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        header.top .sub {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .install-banner {
+            background: linear-gradient(135deg, #1f2d4f, #243a73);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            font-size: 14px;
+            line-height: 1.45;
+            position: relative;
+        }
+        .install-banner b { color: #cfe0ff; }
+        .install-banner .close {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            background: transparent;
+            color: var(--muted);
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 14px;
+        }
+        .field:last-child { margin-bottom: 0; }
+
+        .field > label {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .required::after {
+            content: "*";
+            color: var(--danger);
+            margin-left: 2px;
+        }
+
+        input[type="number"], select {
+            width: 100%;
+            background: var(--bg-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 16px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        select {
+            background-image:
+                linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+            background-position:
+                calc(100% - 18px) 50%,
+                calc(100% - 12px) 50%;
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+            padding-right: 36px;
+        }
+        input:focus, select:focus { border-color: var(--accent); }
+
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        .switch-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .switch-row .label-wrap { display: flex; align-items: center; gap: 8px; }
+        .switch-row .label-wrap label { color: var(--text); font-size: 15px; }
+
+        .info-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+            flex: 0 0 auto;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #2b3a5e;
+            transition: 0.2s;
+            border-radius: 28px;
+        }
+        .slider::before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            top: 3px;
+            background: #fff;
+            transition: 0.2s;
+            border-radius: 50%;
+        }
+        .switch input:checked + .slider { background: var(--accent); }
+        .switch input:checked + .slider::before { transform: translateX(22px); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 16px 18px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn:active { background: var(--accent-2); }
+        .btn.secondary {
+            background: rgba(255,255,255,0.12);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn.danger { background: var(--danger); }
+
+        .error-text {
+            color: var(--danger);
+            font-size: 13px;
+            margin-top: 6px;
+            display: none;
+        }
+        .field.invalid .error-text { display: block; }
+        .field.invalid input,
+        .field.invalid select { border-color: var(--danger); }
+
+        /* Timer page */
+        #timerPage {
+            display: none;
+            text-align: center;
+            padding-top: 8px;
+        }
+        .pc-line {
+            font-size: 13px;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 18px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .countdown {
+            font-size: clamp(80px, 26vw, 160px);
+            font-weight: 700;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 1px;
+            margin: 24px 0 14px;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        }
+        .rpm-line {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-variant-numeric: tabular-nums;
+            color: #fff;
+        }
+        .rpm-line.next {
+            font-size: 16px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.78);
+            margin-bottom: 6px;
+        }
+        .rpm-line .lvl { color: rgba(255,255,255,0.75); font-weight: 500; }
+
+        .total-line {
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            margin-top: 14px;
+            margin-bottom: 22px;
+        }
+
+        .progress {
+            height: 6px;
+            background: rgba(255,255,255,0.18);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 22px;
+        }
+        .progress > div {
+            height: 100%;
+            width: 0%;
+            background: rgba(255,255,255,0.85);
+            transition: width 0.2s linear;
+        }
+        .timer-actions { display: flex; gap: 10px; }
+        .timer-actions .btn { flex: 1; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: calc(24px + env(safe-area-inset-bottom));
+            transform: translateX(-50%) translateY(20px);
+            background: #1f2a45;
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            max-width: 92vw;
+            text-align: center;
+            z-index: 1000;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .lock-screen-hint {
+            color: var(--muted);
+            font-size: 11px;
+            text-align: center;
+            margin-top: 14px;
+        }
+        .offline-status {
+            text-align: center;
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+        .offline-status .ok { color: var(--ok); }
+        .offline-status .warn { color: #ffb547; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div id="installBanner" class="install-banner" style="display:none;">
+            <button class="close" id="installClose" aria-label="Close">&times;</button>
+            <b>Install this app</b>
+            <div id="installInstructions" style="margin-top:4px;"></div>
+        </div>
+
+        <!-- Main form page -->
+        <section id="mainPage">
+            <header class="top">
+                <div>
+                    <h1>RPM Fast Downlink</h1>
+                    <div class="sub">Configure transmission</div>
+                </div>
+            </header>
+
+            <div class="card">
+                <div class="field" id="f-bitPeriod">
+                    <label class="required" for="bitPeriod">Bit period (s)</label>
+                    <select id="bitPeriod">
+                        <option value="18">18</option>
+                        <option value="36" selected>36</option>
+                        <option value="54">54</option>
+                    </select>
+                </div>
+
+                <div class="row">
+                    <div class="field" id="f-rpmLow">
+                        <label for="rpmLow">Low signal RPM</label>
+                        <input id="rpmLow" type="number" inputmode="numeric" min="0" placeholder="120" />
+                    </div>
+                    <div class="field" id="f-rpmHigh">
+                        <label for="rpmHigh">High signal RPM</label>
+                        <input id="rpmHigh" type="number" inputmode="numeric" min="0" placeholder="240" />
+                    </div>
+                </div>
+
+                <div class="field" id="f-precursor">
+                    <label class="required" for="precursor">Precursor</label>
+                    <input id="precursor" type="number" inputmode="numeric" min="0" max="5" placeholder="0 - 5" required />
+                    <div class="error-text">Required. Must match a defined precursor (0 - 5).</div>
+                </div>
+
+                <div class="field" id="f-command">
+                    <label class="required" for="command">Command</label>
+                    <input id="command" type="number" inputmode="numeric" min="0" max="31" placeholder="0 - 31" required />
+                    <div class="error-text">Required. 5-bit command (0 - 31).</div>
+                </div>
+
+                <div class="field">
+                    <div class="switch-row">
+                        <div class="label-wrap">
+                            <label for="quietPeriod">Quiet period</label>
+                            <button type="button" id="quietInfo" class="info-btn" aria-label="More information">i</button>
+                        </div>
+                        <label class="switch">
+                            <input id="quietPeriod" type="checkbox" checked />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <button id="startBtn" class="btn">Start downlink</button>
+            <div class="lock-screen-hint">Tip: Keep your screen awake during transmission.</div>
+            <div id="offlineStatus" class="offline-status"></div>
+        </section>
+
+        <!-- Timer page -->
+        <section id="timerPage">
+            <div class="pc-line" id="pcLine">Precursor: - · Command: -</div>
+            <div class="countdown" id="countdown">00:00</div>
+            <div class="rpm-line">Now: <span id="rpmValue">--</span> <span class="lvl">(<span id="rpmLevel">-</span>)</span></div>
+            <div class="rpm-line next">Next: <span id="rpmValueNext">--</span> <span class="lvl">(<span id="rpmLevelNext">-</span>)</span></div>
+            <div class="total-line">Total remaining: <span id="totalRemaining">--:--</span></div>
+            <div class="progress"><div id="progressBar"></div></div>
+            <div class="timer-actions">
+                <button id="cancelBtn" class="btn secondary">Cancel</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script>
+    'use strict';
+
+    // ----- Persistence helpers -----
+    const STORAGE_KEY = 'rpm_downlink_settings_v1';
+    function loadSettings() {
+        try {
+            const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            if (s && typeof s === 'object') return s;
+        } catch (_) {}
+        return {};
+    }
+    function saveSettings(s) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (_) {}
+    }
+
+    // ----- Precursor table from rpm_downlink_timing.py -----
+    const precursorDict = {
+        0: [1,0,1,0,0,1,0,1,0,1,0,1,1,0],
+        1: [1,0,0,1,1,0,0,1,0,1,1,0,0,1],
+        2: [1,0,0,1,0,1,1,0,1,0,0,1,0,1],
+        3: [1,0,0,1,1,0,1,0,0,1,0,1,1,0],
+        4: [1,0,0,1,0,1,0,1,1,0,1,0,1,0],
+        5: [1,0,0,1,0,1,0,1,0,1,0,1,0,1],
+    };
+
+    function buildWaveform(command, precursorNumber) {
+        const waveform = (precursorDict[precursorNumber] || []).slice();
+        let parity = 0;
+        let cmd = command;
+        for (let i = 0; i < 5; i++) {
+            if ((cmd & 16) !== 0) {
+                waveform.push(0, 1);
+                parity++;
+            } else {
+                waveform.push(1, 0);
+            }
+            cmd = cmd << 1;
+        }
+        if ((parity & 1) === 0) {
+            waveform.push(0, 1);
+        } else {
+            waveform.push(1, 0);
+        }
+        waveform.push(1);
+        return waveform;
+    }
+
+    // Build a timeline of phases.
+    // Each phase = { duration_s, level: 'H'|'L', rpm }
+    function buildTimeline(opts) {
+        const { command, precursor, bitPeriod, rpmHigh, rpmLow, quietPeriod } = opts;
+        const events = [];
+        if (quietPeriod) {
+            events.push({ duration: 180, level: 'H', rpm: rpmHigh });
+        }
+        const wf = buildWaveform(command, precursor);
+        for (let i = 0; i < wf.length; i++) {
+            const lvl = wf[i];
+            events.push({
+                duration: bitPeriod / 2,
+                level: lvl === 1 ? 'H' : 'L',
+                rpm: lvl === 1 ? rpmHigh : rpmLow
+            });
+        }
+        events.push({ duration: 20, level: 'H', rpm: rpmHigh });
+        events.push({ duration: 100, level: 'H', rpm: rpmHigh });
+        return events;
+    }
+
+    // ----- DOM refs -----
+    const $ = (id) => document.getElementById(id);
+    const mainPage = $('mainPage');
+    const timerPage = $('timerPage');
+    const toastEl = $('toast');
+
+    // ----- Toast -----
+    let toastTimer = null;
+    function showToast(msg, duration = 3500) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
+    }
+
+    // ----- Install banner with device-specific instructions -----
+    function isStandalone() {
+        return (window.navigator.standalone === true) ||
+               window.matchMedia('(display-mode: standalone)').matches ||
+               window.matchMedia('(display-mode: fullscreen)').matches;
+    }
+    function detectPlatform() {
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isAndroid = /Android/.test(ua);
+        return { isIOS, isAndroid };
+    }
+    function maybeShowInstallBanner() {
+        if (isStandalone()) return;
+        if (sessionStorage.getItem('install_banner_dismissed') === '1') return;
+        const { isIOS, isAndroid } = detectPlatform();
+        const banner = $('installBanner');
+        const text = $('installInstructions');
+        if (isIOS) {
+            text.innerHTML = 'For offline use, save this page as a web app: tap the <b>Share</b> icon in Safari, then choose <b>Add to Home Screen</b>.';
+        } else if (isAndroid) {
+            text.innerHTML = 'For offline use, install this page as an app: tap the <b>menu (⋮)</b> in Chrome, then choose <b>Install app</b>. (If you only see "Add to Home screen", make sure the page is served over HTTPS.)';
+        } else {
+            text.innerHTML = 'For offline use, install this page from your browser menu (look for <b>Install</b> or <b>Add to Home screen</b>).';
+        }
+        banner.style.display = 'block';
+    }
+    $('installClose').addEventListener('click', () => {
+        $('installBanner').style.display = 'none';
+        sessionStorage.setItem('install_banner_dismissed', '1');
+    });
+
+    // ----- Quiet period info -----
+    $('quietInfo').addEventListener('click', () => {
+        showToast('Enable this to add 3 minute high signal before beginning the downlink. Disable if the rpm is already high for last 3 minutes', 5000);
+    });
+
+    // ----- Form validation + start -----
+    function clearError(fieldId) { $(fieldId).classList.remove('invalid'); }
+    function setError(fieldId) { $(fieldId).classList.add('invalid'); }
+    ['f-precursor', 'f-command'].forEach(id => {
+        const input = $(id).querySelector('input');
+        input && input.addEventListener('input', () => clearError(id));
+    });
+
+    function readForm() {
+        const bitPeriod = parseInt($('bitPeriod').value, 10);
+        const rpmLowRaw = $('rpmLow').value.trim();
+        const rpmHighRaw = $('rpmHigh').value.trim();
+        const rpmLow = rpmLowRaw === '' ? 120 : parseInt(rpmLowRaw, 10);
+        const rpmHigh = rpmHighRaw === '' ? 240 : parseInt(rpmHighRaw, 10);
+        const precursorRaw = $('precursor').value.trim();
+        const commandRaw = $('command').value.trim();
+        const quietPeriod = $('quietPeriod').checked;
+
+        let valid = true;
+        clearError('f-precursor');
+        clearError('f-command');
+
+        if (precursorRaw === '' || isNaN(parseInt(precursorRaw, 10)) ||
+            !(parseInt(precursorRaw, 10) in precursorDict)) {
+            setError('f-precursor');
+            valid = false;
+        }
+        if (commandRaw === '' || isNaN(parseInt(commandRaw, 10))) {
+            setError('f-command');
+            valid = false;
+        }
+
+        if (!valid) return null;
+
+        return {
+            bitPeriod,
+            rpmLow,
+            rpmHigh,
+            precursor: parseInt(precursorRaw, 10),
+            command: parseInt(commandRaw, 10),
+            quietPeriod
+        };
+    }
+
+    function applySavedSettings() {
+        const s = loadSettings();
+        if (s.bitPeriod) $('bitPeriod').value = String(s.bitPeriod);
+        if (s.rpmLow != null) $('rpmLow').value = s.rpmLow;
+        if (s.rpmHigh != null) $('rpmHigh').value = s.rpmHigh;
+        if (s.precursor != null) $('precursor').value = s.precursor;
+        if (s.command != null) $('command').value = s.command;
+        if (typeof s.quietPeriod === 'boolean') $('quietPeriod').checked = s.quietPeriod;
+    }
+
+    // ----- Audio (mp3 samples played via Web Audio API for low-latency) -----
+    // Uses Web Audio for precise scheduling and overlapping playback; falls back
+    // to plain HTMLAudioElement if Web Audio isn't available (e.g. very old iOS).
+    let audioCtx = null;
+    const audioBuffers = { beep: null, longBeep: null };
+    const audioFallback = { beep: null, longBeep: null };
+
+    function ensureAudio() {
+        if (!audioCtx) {
+            try {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                audioCtx = AC ? new AC() : null;
+            } catch (_) { audioCtx = null; }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+    }
+
+    async function loadAudioBuffer(url) {
+        if (!audioCtx) return null;
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return null;
+            const data = await resp.arrayBuffer();
+            return await new Promise((resolve, reject) => {
+                // decodeAudioData with callbacks for older Safari compatibility
+                audioCtx.decodeAudioData(data, resolve, reject);
+            });
+        } catch (_) { return null; }
+    }
+
+    async function preloadAudio() {
+        ensureAudio();
+        if (audioCtx) {
+            const [b, lb] = await Promise.all([
+                loadAudioBuffer('beep.mp3'),
+                loadAudioBuffer('long_beep.mp3')
+            ]);
+            audioBuffers.beep = b;
+            audioBuffers.longBeep = lb;
+        }
+        // HTMLAudio fallback (also useful before the user gesture unlocks Web Audio)
+        try {
+            audioFallback.beep = new Audio('beep.mp3');
+            audioFallback.longBeep = new Audio('long_beep.mp3');
+            audioFallback.beep.preload = 'auto';
+            audioFallback.longBeep.preload = 'auto';
+        } catch (_) { /* ignore */ }
+    }
+
+    function playSample(name, volume = 1.0) {
+        const buf = name === 'longBeep' ? audioBuffers.longBeep : audioBuffers.beep;
+        if (audioCtx && buf) {
+            try {
+                const src = audioCtx.createBufferSource();
+                src.buffer = buf;
+                const gain = audioCtx.createGain();
+                gain.gain.value = volume;
+                src.connect(gain).connect(audioCtx.destination);
+                src.start(0);
+                return;
+            } catch (_) { /* fall through to HTMLAudio */ }
+        }
+        const fb = name === 'longBeep' ? audioFallback.longBeep : audioFallback.beep;
+        if (fb) {
+            try {
+                const node = fb.cloneNode(true);
+                node.volume = volume;
+                node.play().catch(() => {});
+            } catch (_) { /* ignore */ }
+        }
+    }
+
+    function playBeep() { playSample('beep', 1.0); }
+    function playLongBeep() { playSample('longBeep', 1.0); }
+
+    // ----- Wake lock to keep screen on -----
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+            }
+        } catch (_) { /* ignore */ }
+    }
+    function releaseWakeLock() {
+        try { wakeLock && wakeLock.release && wakeLock.release(); } catch (_) {}
+        wakeLock = null;
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && timerState.running) {
+            requestWakeLock();
+        }
+    });
+
+    // ----- Timer engine -----
+    const timerState = {
+        running: false,
+        rafId: null,
+        startMs: 0,
+        totalSec: 0,
+        events: [],
+        boundaries: [],   // array of {start, end, ev}
+        lastBeepKey: '',  // "<phaseIdx>:<secondsRemaining>" to debounce per-phase beeps
+        currentIndex: -1,
+        config: null
+    };
+
+    function fmtTime(seconds) {
+        seconds = Math.max(0, Math.ceil(seconds));
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function setBodyLevel(level) {
+        document.body.classList.remove('level-h', 'level-l');
+        if (level === 'H') document.body.classList.add('level-h');
+        else if (level === 'L') document.body.classList.add('level-l');
+    }
+
+    function startTimer(config) {
+        const events = buildTimeline(config);
+        const totalSec = events.reduce((a, b) => a + b.duration, 0);
+        const boundaries = [];
+        let acc = 0;
+        for (const e of events) {
+            boundaries.push({ start: acc, end: acc + e.duration, ev: e });
+            acc += e.duration;
+        }
+
+        timerState.running = true;
+        timerState.startMs = performance.now();
+        timerState.totalSec = totalSec;
+        timerState.events = events;
+        timerState.boundaries = boundaries;
+        timerState.lastBeepKey = '';
+        timerState.currentIndex = -1;
+        timerState.config = config;
+
+        $('pcLine').textContent =
+            'Precursor: ' + config.precursor + ' \u00B7 Command: ' + config.command +
+            ' \u00B7 Bit period: ' + config.bitPeriod + 's' +
+            (config.quietPeriod ? ' \u00B7 Quiet on' : '');
+
+        mainPage.style.display = 'none';
+        timerPage.style.display = 'block';
+        requestWakeLock();
+        tick();
+    }
+
+    function tick() {
+        if (!timerState.running) return;
+        const now = performance.now();
+        const elapsedSec = (now - timerState.startMs) / 1000;
+        const totalSec = timerState.totalSec;
+        const totalRemaining = totalSec - elapsedSec;
+
+        // Find current event index
+        let idx = timerState.boundaries.length - 1;
+        for (let i = 0; i < timerState.boundaries.length; i++) {
+            const b = timerState.boundaries[i];
+            if (elapsedSec >= b.start && elapsedSec < b.end) { idx = i; break; }
+        }
+        const cur = timerState.boundaries[idx];
+        const next = timerState.boundaries[idx + 1];
+
+        // Per-phase remaining seconds
+        const phaseRemaining = cur.end - elapsedSec;
+
+        $('countdown').textContent = fmtTime(phaseRemaining);
+        $('rpmValue').textContent = cur.ev.rpm;
+        $('rpmLevel').textContent = cur.ev.level;
+        if (next) {
+            $('rpmValueNext').textContent = next.ev.rpm;
+            $('rpmLevelNext').textContent = next.ev.level;
+        } else {
+            $('rpmValueNext').textContent = '--';
+            $('rpmLevelNext').textContent = '-';
+        }
+        $('totalRemaining').textContent = fmtTime(totalRemaining);
+
+        const pct = Math.min(100, (elapsedSec / totalSec) * 100);
+        $('progressBar').style.width = pct + '%';
+
+        if (idx !== timerState.currentIndex) {
+            // Boundary crossed: previous phase just completed -> long beep.
+            // Skip on the very first phase (no previous phase) and skip if the
+            // entire downlink is finished (handled by finishTimer below).
+            if (timerState.currentIndex !== -1 && elapsedSec < totalSec) {
+                playLongBeep();
+            }
+            timerState.currentIndex = idx;
+            setBodyLevel(cur.ev.level);
+        }
+
+        // Per-phase alert: short beep once per second for the last 3 seconds
+        // of the current phase (3, 2, 1).
+        const phaseRemCeil = Math.ceil(phaseRemaining);
+        if (phaseRemCeil <= 3 && phaseRemCeil >= 1) {
+            const key = idx + ':' + phaseRemCeil;
+            if (timerState.lastBeepKey !== key) {
+                timerState.lastBeepKey = key;
+                playBeep();
+            }
+        }
+
+        if (elapsedSec >= totalSec) {
+            finishTimer();
+            return;
+        }
+        timerState.rafId = requestAnimationFrame(tick);
+    }
+
+    function finishTimer() {
+        timerState.running = false;
+        if (timerState.rafId) cancelAnimationFrame(timerState.rafId);
+        $('countdown').textContent = '00:00';
+        $('progressBar').style.width = '100%';
+        $('totalRemaining').textContent = '00:00';
+        $('rpmValueNext').textContent = '--';
+        $('rpmLevelNext').textContent = '-';
+        playLongBeep();
+        releaseWakeLock();
+        showToast('Downlink complete', 4000);
+    }
+
+    function cancelTimer() {
+        timerState.running = false;
+        if (timerState.rafId) cancelAnimationFrame(timerState.rafId);
+        releaseWakeLock();
+        setBodyLevel(null);
+        timerPage.style.display = 'none';
+        mainPage.style.display = 'block';
+    }
+
+    $('startBtn').addEventListener('click', async () => {
+        const cfg = readForm();
+        if (!cfg) { showToast('Please fix the highlighted fields'); return; }
+        saveSettings(cfg);
+        // Unlock + preload audio inside the user gesture so beep.mp3 /
+        // long_beep.mp3 are ready for the first phase boundary on mobile.
+        ensureAudio();
+        if (!audioBuffers.beep || !audioBuffers.longBeep) {
+            await preloadAudio();
+        }
+        startTimer(cfg);
+    });
+    $('cancelBtn').addEventListener('click', cancelTimer);
+
+    // ----- Init -----
+    applySavedSettings();
+    maybeShowInstallBanner();
+
+    // ----- Service worker registration (offline) -----
+    function setOfflineStatus(text, cls) {
+        const el = $('offlineStatus');
+        if (!el) return;
+        const span = cls ? '<span class="' + cls + '">' + text + '</span>' : text;
+        el.innerHTML = 'Offline mode: ' + span;
+    }
+    if (location.protocol === 'file:') {
+        setOfflineStatus('not available (page opened via file://). Host over HTTPS or http://localhost.', 'warn');
+    } else if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then((reg) => {
+                    setOfflineStatus('ready (service worker active).', 'ok');
+                    if (reg.waiting) reg.waiting.postMessage && null;
+                })
+                .catch((err) => {
+                    setOfflineStatus('failed to register service worker (' + (err && err.message ? err.message : 'unknown') + ').', 'warn');
+                });
+        });
+    } else {
+        setOfflineStatus('not supported by this browser.', 'warn');
+    }
+    </script>
+</body>
+</html>
