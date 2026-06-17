@@ -25,8 +25,8 @@
             --danger: #ff6b6b;
             --ok: #34c759;
             --border: #243456;
-            --hi-bg: #c0392b;   /* red for HIGH level transmission */
-            --lo-bg: #1f4e8c;   /* blue for LOW level transmission */
+            --hi-bg: #c0392b;
+            --lo-bg: #1f4e8c;
             --radius: 14px;
         }
 
@@ -124,11 +124,6 @@
             align-items: center;
             gap: 8px;
         }
-        .required::after {
-            content: "*";
-            color: var(--danger);
-            margin-left: 2px;
-        }
 
         input[type="number"], select {
             width: 100%;
@@ -154,6 +149,7 @@
             padding-right: 36px;
         }
         input:focus, select:focus { border-color: var(--accent); }
+        input[readonly] { opacity: 0.65; cursor: default; }
 
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -227,13 +223,13 @@
             cursor: pointer;
             transition: background 0.15s;
         }
-        .btn:active { background: var(--accent-2); }
+        .btn:active:not(:disabled) { background: var(--accent-2); }
+        .btn:disabled { background: #2b3a5e; color: var(--muted); cursor: not-allowed; }
         .btn.secondary {
             background: rgba(255,255,255,0.12);
             color: var(--text);
             border: 1px solid rgba(255,255,255,0.2);
         }
-        .btn.danger { background: var(--danger); }
 
         .error-text {
             color: var(--danger);
@@ -242,8 +238,10 @@
             display: none;
         }
         .field.invalid .error-text { display: block; }
-        .field.invalid input,
-        .field.invalid select { border-color: var(--danger); }
+        .field.invalid input { border-color: var(--danger); }
+
+        /* Select downlink button on main page */
+        #selectDownlinkBtn { margin-bottom: 14px; }
 
         /* Timer page */
         #timerPage {
@@ -307,6 +305,110 @@
         .timer-actions { display: flex; gap: 10px; }
         .timer-actions .btn { flex: 1; }
 
+        /* Select downlink page — fixed full-screen overlay */
+        #selectPage {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            flex-direction: column;
+            z-index: 100;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #selectPage.visible { display: flex; }
+
+        .select-header {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .back-btn {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            font-size: 26px;
+            cursor: pointer;
+            padding: 0 10px 0 0;
+            line-height: 1;
+            flex: 0 0 auto;
+        }
+        .select-header h1 {
+            font-size: 18px;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .search-wrap {
+            flex: 0 0 auto;
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .search-wrap input {
+            width: 100%;
+            background: var(--bg-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 16px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .search-wrap input:focus { border-color: var(--accent); }
+        .search-wrap input::placeholder { color: var(--muted); }
+
+        .cmd-list {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .cmd-empty {
+            padding: 32px 16px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .cmd-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+            user-select: none;
+        }
+        .cmd-item:active { background: rgba(79,140,255,0.1); }
+        .cmd-item.selected {
+            background: rgba(79,140,255,0.13);
+            border-left: 3px solid var(--accent);
+            padding-left: 13px;
+        }
+
+        .cmd-pp {
+            font-size: 11px;
+            color: var(--accent-2);
+            margin-bottom: 3px;
+            font-family: "SF Mono", "Fira Code", monospace;
+            letter-spacing: 0.4px;
+        }
+        .cmd-label { font-size: 16px; color: var(--text); }
+
+        .select-bottom {
+            flex: 0 0 auto;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            padding: 12px 16px;
+        }
+        .select-bottom .row { margin-bottom: 10px; }
+        .select-bottom .field { margin-bottom: 0; }
+        .select-bottom .field > label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+
         /* Toast */
         .toast {
             position: fixed;
@@ -356,7 +458,7 @@
             <div id="installInstructions" style="margin-top:4px;"></div>
         </div>
 
-        <!-- Main form page -->
+        <!-- Main config page -->
         <section id="mainPage">
             <header class="top">
                 <div>
@@ -366,8 +468,8 @@
             </header>
 
             <div class="card">
-                <div class="field" id="f-bitPeriod">
-                    <label class="required" for="bitPeriod">Bit period (s)</label>
+                <div class="field">
+                    <label for="bitPeriod">Bit period (s)</label>
                     <select id="bitPeriod">
                         <option value="18">18</option>
                         <option value="36" selected>36</option>
@@ -376,29 +478,17 @@
                 </div>
 
                 <div class="row">
-                    <div class="field" id="f-rpmLow">
+                    <div class="field">
                         <label for="rpmLow">Low signal RPM</label>
                         <input id="rpmLow" type="number" inputmode="numeric" min="0" placeholder="120" />
                     </div>
-                    <div class="field" id="f-rpmHigh">
+                    <div class="field">
                         <label for="rpmHigh">High signal RPM</label>
                         <input id="rpmHigh" type="number" inputmode="numeric" min="0" placeholder="240" />
                     </div>
                 </div>
 
-                <div class="field" id="f-precursor">
-                    <label class="required" for="precursor">Precursor</label>
-                    <input id="precursor" type="number" inputmode="numeric" min="0" max="5" placeholder="0 - 5" required />
-                    <div class="error-text">Required. Must match a defined precursor (0 - 5).</div>
-                </div>
-
-                <div class="field" id="f-command">
-                    <label class="required" for="command">Command</label>
-                    <input id="command" type="number" inputmode="numeric" min="0" max="31" placeholder="0 - 31" required />
-                    <div class="error-text">Required. 5-bit command (0 - 31).</div>
-                </div>
-
-                <div class="field">
+                <div class="field" style="margin-bottom:0;">
                     <div class="switch-row">
                         <div class="label-wrap">
                             <label for="quietPeriod">Quiet period</label>
@@ -412,7 +502,8 @@
                 </div>
             </div>
 
-            <button id="startBtn" class="btn">Start downlink</button>
+            <button id="selectDownlinkBtn" class="btn">Select Downlink</button>
+
             <div class="lock-screen-hint">Tip: Keep your screen awake during transmission.</div>
             <div id="offlineStatus" class="offline-status"></div>
         </section>
@@ -431,13 +522,102 @@
         </section>
     </div>
 
+    <!-- Select downlink page — fixed full-screen overlay, outside .app to avoid max-width -->
+    <div id="selectPage">
+        <div class="select-header">
+            <button class="back-btn" id="backToMainBtn" aria-label="Back">&#8249;</button>
+            <h1>Select Downlink</h1>
+        </div>
+        <div class="search-wrap">
+            <input id="cmdSearch" type="search" placeholder="Search commands…" autocomplete="off" autocorrect="off" spellcheck="false" />
+        </div>
+        <div class="cmd-list" id="cmdList"></div>
+        <div class="select-bottom">
+            <div class="row">
+                <div class="field" id="fs-precursor">
+                    <label for="sPrecursor">Precursor</label>
+                    <input id="sPrecursor" type="number" inputmode="numeric" min="0" max="5" readonly placeholder="—" />
+                    <div class="error-text">Must be 0–5.</div>
+                </div>
+                <div class="field" id="fs-command">
+                    <label for="sCommand">Command</label>
+                    <input id="sCommand" type="number" inputmode="numeric" min="0" max="31" readonly placeholder="—" />
+                    <div class="error-text">Must be 0–31.</div>
+                </div>
+            </div>
+            <button id="startBtn" class="btn" disabled>Start Downlink</button>
+        </div>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script>
     'use strict';
 
-    // ----- Persistence helpers -----
-    const STORAGE_KEY = 'rpm_downlink_settings_v1';
+    // ----- Downlink command table -----
+    const DOWNLINK_COMMANDS = [
+        { label: 'Config File Number 1',        precursor: 0, command: 0  },
+        { label: 'Config File Number 2',        precursor: 0, command: 1  },
+        { label: 'Config File Number 3',        precursor: 0, command: 2  },
+        { label: 'Config File Number 4',        precursor: 0, command: 3  },
+        { label: 'Config File Number 5',        precursor: 0, command: 4  },
+        { label: 'Config File Number 6',        precursor: 0, command: 5  },
+        { label: 'Config File Number 7',        precursor: 0, command: 6  },
+        { label: 'Config File Number 8',        precursor: 0, command: 7  },
+        { label: 'Strategy EM',                 precursor: 0, command: 8  },
+        { label: 'Strategy Mud',                precursor: 0, command: 9  },
+        { label: 'Strategy Hybrid Single',      precursor: 0, command: 10 },
+        { label: 'Strategy Hybrid Double',      precursor: 0, command: 11 },
+        { label: 'EM Data Rate 10, 2',          precursor: 0, command: 12 },
+        { label: 'EM Max Power 20W',            precursor: 0, command: 13 },
+        { label: 'EM Max Power 15W',            precursor: 0, command: 14 },
+        { label: 'EM Max Power 10W',            precursor: 0, command: 15 },
+        { label: 'System Power Cycle',          precursor: 0, command: 16 },
+        { label: 'EM Max Power 3W',             precursor: 0, command: 17 },
+        { label: 'MP Data Rate 1.75 1.75',      precursor: 0, command: 18 },
+        { label: 'EM Listening 8, 8',           precursor: 0, command: 19 },
+        { label: 'MP Data Rate 0.75 0.75',      precursor: 0, command: 20 },
+        { label: 'MP Data Rate 1.0 1.0',        precursor: 0, command: 21 },
+        { label: 'MP Data Rate 1.5 0.75',       precursor: 0, command: 22 },
+        { label: 'MP Data Rate 1.5 1.5',        precursor: 0, command: 23 },
+        { label: 'MP Data Rate 2.0 1.0',        precursor: 0, command: 24 },
+        { label: 'MP Data Rate 2.0 2.0',        precursor: 0, command: 25 },
+        { label: 'Flow Method On Board',        precursor: 0, command: 26 },
+        { label: 'EM Data Rate 2, 2',           precursor: 0, command: 27 },
+        { label: 'EM Data Rate 4, 2',           precursor: 0, command: 28 },
+        { label: 'EM Data Rate 6, 2',           precursor: 0, command: 29 },
+        { label: 'EM Data Rate 8, 2',           precursor: 0, command: 30 },
+        { label: 'Flow Method DNI',             precursor: 0, command: 31 },
+        { label: 'Gyrodata Outrun Enter',       precursor: 3, command: 0  },
+        { label: 'Gyrodata Outrun Exit',        precursor: 3, command: 1  },
+        { label: 'Gyrodata Toggle 30S',         precursor: 3, command: 2  },
+        { label: 'Gyrodata Toggle 60S',         precursor: 3, command: 3  },
+        { label: 'Gyrodata Toggle 90S',         precursor: 3, command: 4  },
+        { label: 'Gyrodata Reset Tool',         precursor: 3, command: 5  },
+        { label: 'S2 EM Spin Free',             precursor: 4, command: 0  },
+        { label: 'S2 EM Spin Slow',             precursor: 4, command: 1  },
+        { label: 'S2 EM Spin Brake',            precursor: 4, command: 2  },
+        { label: 'S2 Flow Off Free Never',      precursor: 4, command: 3  },
+        { label: 'S2 Flow Off Free 30',         precursor: 4, command: 4  },
+        { label: 'BM2 Idle Forever',            precursor: 4, command: 5  },
+        { label: 'BM2 Idle Until Rotation',     precursor: 4, command: 6  },
+        { label: 'MP Data Rate 1.5, 1.0',       precursor: 5, command: 0  },
+        { label: 'MP Data Rate 1.25, 1.25',     precursor: 5, command: 1  },
+        { label: 'MP Data Rate 2.25, 1.125',    precursor: 5, command: 2  },
+        { label: 'MP Data Rate 2.5, 1.25',      precursor: 5, command: 3  },
+        { label: 'MP Data Rate 2.75, 1.375',    precursor: 5, command: 4  },
+        { label: 'MP Data Rate 3, 1',           precursor: 5, command: 5  },
+        { label: 'MP Data Rate 3, 1.5',         precursor: 5, command: 6  },
+        { label: 'MP Data Rate 4, 1',           precursor: 5, command: 7  },
+        { label: 'MP Data Rate 4, 2',           precursor: 5, command: 8  },
+        { label: 'Flow On Survey Enable',       precursor: 5, command: 14 },
+        { label: 'Flow On Survey Disable',      precursor: 5, command: 15 },
+        { label: 'Custom Downlink',             precursor: null, command: null },
+    ];
+    const CUSTOM_IDX = DOWNLINK_COMMANDS.length - 1;
+
+    // ----- Persistence -----
+    const STORAGE_KEY = 'rpm_downlink_settings_v2';
     function loadSettings() {
         try {
             const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -449,7 +629,7 @@
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (_) {}
     }
 
-    // ----- Precursor table from rpm_downlink_timing.py -----
+    // ----- Waveform logic (from rpm_downlink_timing.py) -----
     const precursorDict = {
         0: [1,0,1,0,0,1,0,1,0,1,0,1,1,0],
         1: [1,0,0,1,1,0,0,1,0,1,1,0,0,1],
@@ -464,50 +644,34 @@
         let parity = 0;
         let cmd = command;
         for (let i = 0; i < 5; i++) {
-            if ((cmd & 16) !== 0) {
-                waveform.push(0, 1);
-                parity++;
-            } else {
-                waveform.push(1, 0);
-            }
+            if ((cmd & 16) !== 0) { waveform.push(0, 1); parity++; }
+            else { waveform.push(1, 0); }
             cmd = cmd << 1;
         }
-        if ((parity & 1) === 0) {
-            waveform.push(0, 1);
-        } else {
-            waveform.push(1, 0);
-        }
+        waveform.push((parity & 1) === 0 ? 0 : 1, (parity & 1) === 0 ? 1 : 0);
         waveform.push(1);
         return waveform;
     }
 
-    // Build a timeline of phases.
-    // Each phase = { duration_s, level: 'H'|'L', rpm }
     function buildTimeline(opts) {
         const { command, precursor, bitPeriod, rpmHigh, rpmLow, quietPeriod } = opts;
         const events = [];
-        if (quietPeriod) {
-            events.push({ duration: 180, level: 'H', rpm: rpmHigh });
-        }
+        if (quietPeriod) events.push({ duration: 180, level: 'H', rpm: rpmHigh });
         const wf = buildWaveform(command, precursor);
-        for (let i = 0; i < wf.length; i++) {
-            const lvl = wf[i];
-            events.push({
-                duration: bitPeriod / 2,
-                level: lvl === 1 ? 'H' : 'L',
-                rpm: lvl === 1 ? rpmHigh : rpmLow
-            });
+        for (const lvl of wf) {
+            events.push({ duration: bitPeriod / 2, level: lvl === 1 ? 'H' : 'L', rpm: lvl === 1 ? rpmHigh : rpmLow });
         }
-        events.push({ duration: 20, level: 'H', rpm: rpmHigh });
+        events.push({ duration: 20,  level: 'H', rpm: rpmHigh });
         events.push({ duration: 100, level: 'H', rpm: rpmHigh });
         return events;
     }
 
-    // ----- DOM refs -----
+    // ----- DOM helpers -----
     const $ = (id) => document.getElementById(id);
-    const mainPage = $('mainPage');
-    const timerPage = $('timerPage');
-    const toastEl = $('toast');
+    const mainPage   = $('mainPage');
+    const selectPage = $('selectPage');
+    const timerPage  = $('timerPage');
+    const toastEl    = $('toast');
 
     // ----- Toast -----
     let toastTimer = null;
@@ -518,7 +682,7 @@
         toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
     }
 
-    // ----- Install banner with device-specific instructions -----
+    // ----- Install banner -----
     function isStandalone() {
         return (window.navigator.standalone === true) ||
                window.matchMedia('(display-mode: standalone)').matches ||
@@ -536,11 +700,11 @@
         if (sessionStorage.getItem('install_banner_dismissed') === '1') return;
         const { isIOS, isAndroid } = detectPlatform();
         const banner = $('installBanner');
-        const text = $('installInstructions');
+        const text   = $('installInstructions');
         if (isIOS) {
             text.innerHTML = 'For offline use, save this page as a web app: tap the <b>Share</b> icon in Safari, then choose <b>Add to Home Screen</b>.';
         } else if (isAndroid) {
-            text.innerHTML = 'For offline use, install this page as an app: tap the <b>menu (⋮)</b> in Chrome, then choose <b>Install app</b>. (If you only see "Add to Home screen", make sure the page is served over HTTPS.)';
+            text.innerHTML = 'For offline use, install this page as an app: tap the <b>menu (⋮)</b> in Chrome, then choose <b>Install app</b>.';
         } else {
             text.innerHTML = 'For offline use, install this page from your browser menu (look for <b>Install</b> or <b>Add to Home screen</b>).';
         }
@@ -551,70 +715,177 @@
         sessionStorage.setItem('install_banner_dismissed', '1');
     });
 
-    // ----- Quiet period info -----
     $('quietInfo').addEventListener('click', () => {
         showToast('Enable this to add 3 minute high signal before beginning the downlink. Disable if the rpm is already high for last 3 minutes', 5000);
     });
 
-    // ----- Form validation + start -----
-    function clearError(fieldId) { $(fieldId).classList.remove('invalid'); }
-    function setError(fieldId) { $(fieldId).classList.add('invalid'); }
-    ['f-precursor', 'f-command'].forEach(id => {
-        const input = $(id).querySelector('input');
-        input && input.addEventListener('input', () => clearError(id));
-    });
+    // ----- Selected command state -----
+    let selectedIdx = -1;
 
-    function readForm() {
-        const bitPeriod = parseInt($('bitPeriod').value, 10);
-        const rpmLowRaw = $('rpmLow').value.trim();
+    function ppLabel(cmd) {
+        if (cmd.precursor === null) return '';
+        return 'Precursor ' + cmd.precursor + ', Command ' + cmd.command;
+    }
+
+    function isCustom() { return selectedIdx === CUSTOM_IDX; }
+
+    function updateBottomPanel() {
+        const pInput = $('sPrecursor');
+        const cInput = $('sCommand');
+        if (selectedIdx < 0) {
+            pInput.value = '';
+            cInput.value = '';
+            pInput.readOnly = true;
+            cInput.readOnly = true;
+            $('startBtn').disabled = true;
+            return;
+        }
+        const cmd = DOWNLINK_COMMANDS[selectedIdx];
+        if (isCustom()) {
+            pInput.readOnly = false;
+            cInput.readOnly = false;
+            validateCustom();
+        } else {
+            pInput.readOnly = true;
+            cInput.readOnly = true;
+            pInput.value = cmd.precursor;
+            cInput.value = cmd.command;
+            $('fs-precursor').classList.remove('invalid');
+            $('fs-command').classList.remove('invalid');
+            $('startBtn').disabled = false;
+        }
+    }
+
+    function validateCustom() {
+        const pVal = $('sPrecursor').value.trim();
+        const cVal = $('sCommand').value.trim();
+        const p = parseInt(pVal, 10);
+        const c = parseInt(cVal, 10);
+        const pOk = pVal !== '' && !isNaN(p) && (p in precursorDict);
+        const cOk = cVal !== '' && !isNaN(c) && c >= 0 && c <= 31;
+        $('fs-precursor').classList.toggle('invalid', !pOk);
+        $('fs-command').classList.toggle('invalid', !cOk);
+        $('startBtn').disabled = !(pOk && cOk);
+    }
+
+    function renderCmdList(filter) {
+        const list = $('cmdList');
+        list.innerHTML = '';
+        const q = (filter || '').trim().toLowerCase();
+        let count = 0;
+        DOWNLINK_COMMANDS.forEach((cmd, idx) => {
+            if (q && !cmd.label.toLowerCase().includes(q)) return;
+            count++;
+            const item = document.createElement('div');
+            item.className = 'cmd-item' + (idx === selectedIdx ? ' selected' : '');
+            const pp = ppLabel(cmd);
+            item.innerHTML =
+                (pp ? '<div class="cmd-pp">' + pp + '</div>' : '') +
+                '<div class="cmd-label">' + cmd.label + '</div>';
+            item.addEventListener('click', () => {
+                selectedIdx = idx;
+                list.querySelectorAll('.cmd-item').forEach((el) =>
+                    el.classList.toggle('selected', el === item));
+                updateBottomPanel();
+            });
+            list.appendChild(item);
+        });
+        if (count === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'cmd-empty';
+            empty.textContent = 'No commands match "' + filter.trim() + '"';
+            list.appendChild(empty);
+        }
+    }
+
+    // ----- Page navigation -----
+    function showMainPage() {
+        mainPage.style.display  = 'block';
+        timerPage.style.display = 'none';
+        selectPage.classList.remove('visible');
+    }
+
+    function showSelectPage() {
+        mainPage.style.display  = 'none';
+        timerPage.style.display = 'none';
+        selectPage.classList.add('visible');
+        $('cmdSearch').value = '';
+        renderCmdList('');
+        setTimeout(() => {
+            const sel = $('cmdList').querySelector('.cmd-item.selected');
+            if (sel) sel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 60);
+    }
+
+    function showTimerPage() {
+        mainPage.style.display  = 'none';
+        selectPage.classList.remove('visible');
+        timerPage.style.display = 'block';
+    }
+
+    // ----- Config reading -----
+    function readConfig() {
+        if (selectedIdx < 0) return null;
+        const bitPeriod  = parseInt($('bitPeriod').value, 10);
+        const rpmLowRaw  = $('rpmLow').value.trim();
         const rpmHighRaw = $('rpmHigh').value.trim();
-        const rpmLow = rpmLowRaw === '' ? 120 : parseInt(rpmLowRaw, 10);
-        const rpmHigh = rpmHighRaw === '' ? 240 : parseInt(rpmHighRaw, 10);
-        const precursorRaw = $('precursor').value.trim();
-        const commandRaw = $('command').value.trim();
+        const rpmLow     = rpmLowRaw  === '' ? 120 : parseInt(rpmLowRaw,  10);
+        const rpmHigh    = rpmHighRaw === '' ? 240 : parseInt(rpmHighRaw, 10);
         const quietPeriod = $('quietPeriod').checked;
 
-        let valid = true;
-        clearError('f-precursor');
-        clearError('f-command');
-
-        if (precursorRaw === '' || isNaN(parseInt(precursorRaw, 10)) ||
-            !(parseInt(precursorRaw, 10) in precursorDict)) {
-            setError('f-precursor');
-            valid = false;
+        let precursor, command;
+        if (isCustom()) {
+            const pVal = $('sPrecursor').value.trim();
+            const cVal = $('sCommand').value.trim();
+            const p = parseInt(pVal, 10);
+            const c = parseInt(cVal, 10);
+            if (pVal === '' || isNaN(p) || !(p in precursorDict)) return null;
+            if (cVal === '' || isNaN(c) || c < 0 || c > 31) return null;
+            precursor = p; command = c;
+        } else {
+            const cmd = DOWNLINK_COMMANDS[selectedIdx];
+            precursor = cmd.precursor; command = cmd.command;
         }
-        if (commandRaw === '' || isNaN(parseInt(commandRaw, 10))) {
-            setError('f-command');
-            valid = false;
-        }
-
-        if (!valid) return null;
-
-        return {
-            bitPeriod,
-            rpmLow,
-            rpmHigh,
-            precursor: parseInt(precursorRaw, 10),
-            command: parseInt(commandRaw, 10),
-            quietPeriod
-        };
+        return { bitPeriod, rpmLow, rpmHigh, quietPeriod, precursor, command, selectedIdx };
     }
 
     function applySavedSettings() {
         const s = loadSettings();
-        if (s.bitPeriod) $('bitPeriod').value = String(s.bitPeriod);
-        if (s.rpmLow != null) $('rpmLow').value = s.rpmLow;
+        if (s.bitPeriod)  $('bitPeriod').value = String(s.bitPeriod);
+        if (s.rpmLow  != null) $('rpmLow').value  = s.rpmLow;
         if (s.rpmHigh != null) $('rpmHigh').value = s.rpmHigh;
-        if (s.precursor != null) $('precursor').value = s.precursor;
-        if (s.command != null) $('command').value = s.command;
         if (typeof s.quietPeriod === 'boolean') $('quietPeriod').checked = s.quietPeriod;
+        if (typeof s.selectedIdx === 'number' && s.selectedIdx >= 0 && s.selectedIdx < DOWNLINK_COMMANDS.length) {
+            selectedIdx = s.selectedIdx;
+            if (isCustom() && s.precursor != null && s.command != null) {
+                $('sPrecursor').value = s.precursor;
+                $('sCommand').value   = s.command;
+            }
+        }
     }
 
-    // ----- Audio (mp3 samples played via Web Audio API for low-latency) -----
-    // Uses Web Audio for precise scheduling and overlapping playback; falls back
-    // to plain HTMLAudioElement if Web Audio isn't available (e.g. very old iOS).
+    // ----- Event wiring -----
+    $('sPrecursor').addEventListener('input', () => { if (isCustom()) validateCustom(); });
+    $('sCommand').addEventListener('input',   () => { if (isCustom()) validateCustom(); });
+    $('cmdSearch').addEventListener('input',  () => renderCmdList($('cmdSearch').value));
+
+    $('selectDownlinkBtn').addEventListener('click', showSelectPage);
+    $('backToMainBtn').addEventListener('click', showMainPage);
+    $('cancelBtn').addEventListener('click', cancelTimer);
+
+    $('startBtn').addEventListener('click', async () => {
+        const cfg = readConfig();
+        if (!cfg) { showToast('Please fix the highlighted fields'); return; }
+        saveSettings(cfg);
+        ensureAudio();
+        if (!audioBuffers.beep || !audioBuffers.longBeep) await preloadAudio();
+        startTimer(cfg);
+        showTimerPage();
+    });
+
+    // ----- Audio -----
     let audioCtx = null;
-    const audioBuffers = { beep: null, longBeep: null };
+    const audioBuffers  = { beep: null, longBeep: null };
     const audioFallback = { beep: null, longBeep: null };
 
     function ensureAudio() {
@@ -624,9 +895,7 @@
                 audioCtx = AC ? new AC() : null;
             } catch (_) { audioCtx = null; }
         }
-        if (audioCtx && audioCtx.state === 'suspended') {
-            audioCtx.resume().catch(() => {});
-        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
     }
 
     async function loadAudioBuffer(url) {
@@ -635,95 +904,66 @@
             const resp = await fetch(url);
             if (!resp.ok) return null;
             const data = await resp.arrayBuffer();
-            return await new Promise((resolve, reject) => {
-                // decodeAudioData with callbacks for older Safari compatibility
-                audioCtx.decodeAudioData(data, resolve, reject);
-            });
+            return await new Promise((resolve, reject) => audioCtx.decodeAudioData(data, resolve, reject));
         } catch (_) { return null; }
     }
 
     async function preloadAudio() {
         ensureAudio();
         if (audioCtx) {
-            const [b, lb] = await Promise.all([
-                loadAudioBuffer('beep.mp3'),
-                loadAudioBuffer('long_beep.mp3')
-            ]);
-            audioBuffers.beep = b;
-            audioBuffers.longBeep = lb;
+            const [b, lb] = await Promise.all([loadAudioBuffer('beep.mp3'), loadAudioBuffer('long_beep.mp3')]);
+            audioBuffers.beep = b; audioBuffers.longBeep = lb;
         }
-        // HTMLAudio fallback (also useful before the user gesture unlocks Web Audio)
         try {
             audioFallback.beep = new Audio('beep.mp3');
             audioFallback.longBeep = new Audio('long_beep.mp3');
             audioFallback.beep.preload = 'auto';
             audioFallback.longBeep.preload = 'auto';
-        } catch (_) { /* ignore */ }
+        } catch (_) {}
     }
 
     function playSample(name, volume = 1.0) {
         const buf = name === 'longBeep' ? audioBuffers.longBeep : audioBuffers.beep;
         if (audioCtx && buf) {
             try {
-                const src = audioCtx.createBufferSource();
-                src.buffer = buf;
+                const src  = audioCtx.createBufferSource();
                 const gain = audioCtx.createGain();
+                src.buffer = buf;
                 gain.gain.value = volume;
                 src.connect(gain).connect(audioCtx.destination);
                 src.start(0);
                 return;
-            } catch (_) { /* fall through to HTMLAudio */ }
+            } catch (_) {}
         }
         const fb = name === 'longBeep' ? audioFallback.longBeep : audioFallback.beep;
-        if (fb) {
-            try {
-                const node = fb.cloneNode(true);
-                node.volume = volume;
-                node.play().catch(() => {});
-            } catch (_) { /* ignore */ }
-        }
+        if (fb) { try { const n = fb.cloneNode(true); n.volume = volume; n.play().catch(() => {}); } catch (_) {} }
     }
 
-    function playBeep() { playSample('beep', 1.0); }
+    function playBeep()     { playSample('beep',     1.0); }
     function playLongBeep() { playSample('longBeep', 1.0); }
 
-    // ----- Wake lock to keep screen on -----
+    // ----- Wake lock -----
     let wakeLock = null;
     async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
-        } catch (_) { /* ignore */ }
+        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
     }
     function releaseWakeLock() {
         try { wakeLock && wakeLock.release && wakeLock.release(); } catch (_) {}
         wakeLock = null;
     }
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && timerState.running) {
-            requestWakeLock();
-        }
+        if (document.visibilityState === 'visible' && timerState.running) requestWakeLock();
     });
 
     // ----- Timer engine -----
     const timerState = {
-        running: false,
-        rafId: null,
-        startMs: 0,
-        totalSec: 0,
-        events: [],
-        boundaries: [],   // array of {start, end, ev}
-        lastBeepKey: '',  // "<phaseIdx>:<secondsRemaining>" to debounce per-phase beeps
-        currentIndex: -1,
-        config: null
+        running: false, rafId: null, startMs: 0, totalSec: 0,
+        boundaries: [], lastBeepKey: '', currentIndex: -1
     };
 
     function fmtTime(seconds) {
         seconds = Math.max(0, Math.ceil(seconds));
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
     }
 
     function setBodyLevel(level) {
@@ -733,106 +973,75 @@
     }
 
     function startTimer(config) {
-        const events = buildTimeline(config);
+        const events   = buildTimeline(config);
         const totalSec = events.reduce((a, b) => a + b.duration, 0);
         const boundaries = [];
         let acc = 0;
-        for (const e of events) {
-            boundaries.push({ start: acc, end: acc + e.duration, ev: e });
-            acc += e.duration;
-        }
+        for (const e of events) { boundaries.push({ start: acc, end: acc + e.duration, ev: e }); acc += e.duration; }
 
-        timerState.running = true;
-        timerState.startMs = performance.now();
-        timerState.totalSec = totalSec;
-        timerState.events = events;
-        timerState.boundaries = boundaries;
-        timerState.lastBeepKey = '';
+        timerState.running      = true;
+        timerState.startMs      = performance.now();
+        timerState.totalSec     = totalSec;
+        timerState.boundaries   = boundaries;
+        timerState.lastBeepKey  = '';
         timerState.currentIndex = -1;
-        timerState.config = config;
 
         $('pcLine').textContent =
-            'Precursor: ' + config.precursor + ' \u00B7 Command: ' + config.command +
-            ' \u00B7 Bit period: ' + config.bitPeriod + 's' +
-            (config.quietPeriod ? ' \u00B7 Quiet on' : '');
+            'Precursor: ' + config.precursor + ' · Command: ' + config.command +
+            ' · Bit period: ' + config.bitPeriod + 's' +
+            (config.quietPeriod ? ' · Quiet on' : '');
 
-        mainPage.style.display = 'none';
-        timerPage.style.display = 'block';
         requestWakeLock();
         tick();
     }
 
     function tick() {
         if (!timerState.running) return;
-        const now = performance.now();
-        const elapsedSec = (now - timerState.startMs) / 1000;
-        const totalSec = timerState.totalSec;
+        const elapsedSec    = (performance.now() - timerState.startMs) / 1000;
+        const totalSec      = timerState.totalSec;
         const totalRemaining = totalSec - elapsedSec;
 
-        // Find current event index
         let idx = timerState.boundaries.length - 1;
         for (let i = 0; i < timerState.boundaries.length; i++) {
             const b = timerState.boundaries[i];
             if (elapsedSec >= b.start && elapsedSec < b.end) { idx = i; break; }
         }
-        const cur = timerState.boundaries[idx];
+        const cur  = timerState.boundaries[idx];
         const next = timerState.boundaries[idx + 1];
-
-        // Per-phase remaining seconds
         const phaseRemaining = cur.end - elapsedSec;
 
-        $('countdown').textContent = fmtTime(phaseRemaining);
-        $('rpmValue').textContent = cur.ev.rpm;
-        $('rpmLevel').textContent = cur.ev.level;
-        if (next) {
-            $('rpmValueNext').textContent = next.ev.rpm;
-            $('rpmLevelNext').textContent = next.ev.level;
-        } else {
-            $('rpmValueNext').textContent = '--';
-            $('rpmLevelNext').textContent = '-';
-        }
+        $('countdown').textContent    = fmtTime(phaseRemaining);
+        $('rpmValue').textContent     = cur.ev.rpm;
+        $('rpmLevel').textContent     = cur.ev.level;
+        $('rpmValueNext').textContent = next ? next.ev.rpm  : '--';
+        $('rpmLevelNext').textContent = next ? next.ev.level : '-';
         $('totalRemaining').textContent = fmtTime(totalRemaining);
-
-        const pct = Math.min(100, (elapsedSec / totalSec) * 100);
-        $('progressBar').style.width = pct + '%';
+        $('progressBar').style.width  = Math.min(100, (elapsedSec / totalSec) * 100) + '%';
 
         if (idx !== timerState.currentIndex) {
-            // Boundary crossed: previous phase just completed -> long beep.
-            // Skip on the very first phase (no previous phase) and skip if the
-            // entire downlink is finished (handled by finishTimer below).
-            if (timerState.currentIndex !== -1 && elapsedSec < totalSec) {
-                playLongBeep();
-            }
+            if (timerState.currentIndex !== -1 && elapsedSec < totalSec) playLongBeep();
             timerState.currentIndex = idx;
             setBodyLevel(cur.ev.level);
         }
 
-        // Per-phase alert: short beep once per second for the last 3 seconds
-        // of the current phase (3, 2, 1).
         const phaseRemCeil = Math.ceil(phaseRemaining);
         if (phaseRemCeil <= 3 && phaseRemCeil >= 1) {
             const key = idx + ':' + phaseRemCeil;
-            if (timerState.lastBeepKey !== key) {
-                timerState.lastBeepKey = key;
-                playBeep();
-            }
+            if (timerState.lastBeepKey !== key) { timerState.lastBeepKey = key; playBeep(); }
         }
 
-        if (elapsedSec >= totalSec) {
-            finishTimer();
-            return;
-        }
+        if (elapsedSec >= totalSec) { finishTimer(); return; }
         timerState.rafId = requestAnimationFrame(tick);
     }
 
     function finishTimer() {
         timerState.running = false;
         if (timerState.rafId) cancelAnimationFrame(timerState.rafId);
-        $('countdown').textContent = '00:00';
-        $('progressBar').style.width = '100%';
+        $('countdown').textContent      = '00:00';
+        $('progressBar').style.width    = '100%';
         $('totalRemaining').textContent = '00:00';
-        $('rpmValueNext').textContent = '--';
-        $('rpmLevelNext').textContent = '-';
+        $('rpmValueNext').textContent   = '--';
+        $('rpmLevelNext').textContent   = '-';
         playLongBeep();
         releaseWakeLock();
         showToast('Downlink complete', 4000);
@@ -843,47 +1052,29 @@
         if (timerState.rafId) cancelAnimationFrame(timerState.rafId);
         releaseWakeLock();
         setBodyLevel(null);
-        timerPage.style.display = 'none';
-        mainPage.style.display = 'block';
+        showMainPage();
     }
-
-    $('startBtn').addEventListener('click', async () => {
-        const cfg = readForm();
-        if (!cfg) { showToast('Please fix the highlighted fields'); return; }
-        saveSettings(cfg);
-        // Unlock + preload audio inside the user gesture so beep.mp3 /
-        // long_beep.mp3 are ready for the first phase boundary on mobile.
-        ensureAudio();
-        if (!audioBuffers.beep || !audioBuffers.longBeep) {
-            await preloadAudio();
-        }
-        startTimer(cfg);
-    });
-    $('cancelBtn').addEventListener('click', cancelTimer);
 
     // ----- Init -----
     applySavedSettings();
+    renderCmdList();
+    updateBottomPanel();
+    showMainPage();
     maybeShowInstallBanner();
 
-    // ----- Service worker registration (offline) -----
+    // ----- Service worker -----
     function setOfflineStatus(text, cls) {
         const el = $('offlineStatus');
         if (!el) return;
-        const span = cls ? '<span class="' + cls + '">' + text + '</span>' : text;
-        el.innerHTML = 'Offline mode: ' + span;
+        el.innerHTML = 'Offline mode: ' + (cls ? '<span class="' + cls + '">' + text + '</span>' : text);
     }
     if (location.protocol === 'file:') {
         setOfflineStatus('not available (page opened via file://). Host over HTTPS or http://localhost.', 'warn');
     } else if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js')
-                .then((reg) => {
-                    setOfflineStatus('ready (service worker active).', 'ok');
-                    if (reg.waiting) reg.waiting.postMessage && null;
-                })
-                .catch((err) => {
-                    setOfflineStatus('failed to register service worker (' + (err && err.message ? err.message : 'unknown') + ').', 'warn');
-                });
+                .then(() => setOfflineStatus('ready (service worker active).', 'ok'))
+                .catch((err) => setOfflineStatus('failed to register service worker (' + (err && err.message ? err.message : 'unknown') + ').', 'warn'));
         });
     } else {
         setOfflineStatus('not supported by this browser.', 'warn');
