@@ -305,6 +305,31 @@
         .timer-actions { display: flex; gap: 10px; }
         .timer-actions .btn { flex: 1; }
 
+        /* Summary page */
+        #summaryPage { display: none; padding-top: 8px; }
+        .summary-header {
+            text-align: center;
+            padding: 16px 4px 20px;
+        }
+        .summary-header h2 {
+            font-size: 22px;
+            margin: 0 0 4px;
+            font-weight: 700;
+            color: var(--ok);
+        }
+        .summary-header .sub { font-size: 13px; color: var(--muted); }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 16px;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-row .key { font-size: 13px; color: var(--muted); flex: 0 0 auto; }
+        .summary-row .val { font-size: 16px; font-weight: 600; color: var(--text); text-align: right; }
+
         /* Select downlink page — fixed full-screen overlay */
         #selectPage {
             display: none;
@@ -520,6 +545,36 @@
                 <button id="cancelBtn" class="btn secondary">Cancel</button>
             </div>
         </section>
+
+        <!-- Summary page -->
+        <section id="summaryPage">
+            <div class="summary-header">
+                <h2>Downlink Complete</h2>
+            </div>
+            <div class="card">
+                <div class="summary-row">
+                    <span class="key">Command</span>
+                    <span class="val" id="sumCommandLabel">—</span>
+                </div>
+                <div class="summary-row">
+                    <span class="key">Precursor</span>
+                    <span class="val" id="sumPrecursor">—</span>
+                </div>
+                <div class="summary-row">
+                    <span class="key">Command #</span>
+                    <span class="val" id="sumCommand">—</span>
+                </div>
+                <div class="summary-row">
+                    <span class="key">Bit period</span>
+                    <span class="val" id="sumBitPeriod">—</span>
+                </div>
+                <div class="summary-row">
+                    <span class="key">Time taken</span>
+                    <span class="val" id="sumTimeTaken">—</span>
+                </div>
+            </div>
+            <button id="newDownlinkBtn" class="btn" style="margin-top:14px;">Start New Downlink</button>
+        </section>
     </div>
 
     <!-- Select downlink page — fixed full-screen overlay, outside .app to avoid max-width -->
@@ -668,10 +723,11 @@
 
     // ----- DOM helpers -----
     const $ = (id) => document.getElementById(id);
-    const mainPage   = $('mainPage');
-    const selectPage = $('selectPage');
-    const timerPage  = $('timerPage');
-    const toastEl    = $('toast');
+    const mainPage    = $('mainPage');
+    const selectPage  = $('selectPage');
+    const timerPage   = $('timerPage');
+    const summaryPage = $('summaryPage');
+    const toastEl     = $('toast');
 
     // ----- Toast -----
     let toastTimer = null;
@@ -800,14 +856,16 @@
 
     // ----- Page navigation -----
     function showMainPage() {
-        mainPage.style.display  = 'block';
-        timerPage.style.display = 'none';
+        mainPage.style.display    = 'block';
+        timerPage.style.display   = 'none';
+        summaryPage.style.display = 'none';
         selectPage.classList.remove('visible');
     }
 
     function showSelectPage() {
-        mainPage.style.display  = 'none';
-        timerPage.style.display = 'none';
+        mainPage.style.display    = 'none';
+        timerPage.style.display   = 'none';
+        summaryPage.style.display = 'none';
         selectPage.classList.add('visible');
         $('cmdSearch').value = '';
         renderCmdList('');
@@ -818,9 +876,33 @@
     }
 
     function showTimerPage() {
-        mainPage.style.display  = 'none';
+        mainPage.style.display    = 'none';
+        summaryPage.style.display = 'none';
         selectPage.classList.remove('visible');
-        timerPage.style.display = 'block';
+        timerPage.style.display   = 'block';
+    }
+
+    function showSummaryPage(config, totalSec) {
+        const cmd = DOWNLINK_COMMANDS[config.selectedIdx];
+        const label = cmd ? cmd.label : 'Custom Downlink';
+        const secs = Math.round(totalSec);
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        const s = secs % 60;
+        const timeFmt = h > 0 ? h + 'h ' + m + 'm ' + s + 's'
+                      : m > 0 ? m + 'm ' + s + 's'
+                      : s + 's';
+
+        $('sumCommandLabel').textContent = label;
+        $('sumPrecursor').textContent    = config.precursor;
+        $('sumCommand').textContent      = config.command;
+        $('sumBitPeriod').textContent    = config.bitPeriod + ' s';
+        $('sumTimeTaken').textContent    = timeFmt;
+
+        mainPage.style.display    = 'none';
+        timerPage.style.display   = 'none';
+        selectPage.classList.remove('visible');
+        summaryPage.style.display = 'block';
     }
 
     // ----- Config reading -----
@@ -872,6 +954,7 @@
     $('selectDownlinkBtn').addEventListener('click', showSelectPage);
     $('backToMainBtn').addEventListener('click', showMainPage);
     $('cancelBtn').addEventListener('click', cancelTimer);
+    $('newDownlinkBtn').addEventListener('click', showMainPage);
 
     $('startBtn').addEventListener('click', async () => {
         const cfg = readConfig();
@@ -958,7 +1041,7 @@
     // ----- Timer engine -----
     const timerState = {
         running: false, rafId: null, startMs: 0, totalSec: 0,
-        boundaries: [], lastBeepKey: '', currentIndex: -1
+        boundaries: [], lastBeepKey: '', currentIndex: -1, config: null
     };
 
     function fmtTime(seconds) {
@@ -985,6 +1068,7 @@
         timerState.boundaries   = boundaries;
         timerState.lastBeepKey  = '';
         timerState.currentIndex = -1;
+        timerState.config       = config;
 
         $('pcLine').textContent =
             'Precursor: ' + config.precursor + ' · Command: ' + config.command +
@@ -1037,14 +1121,10 @@
     function finishTimer() {
         timerState.running = false;
         if (timerState.rafId) cancelAnimationFrame(timerState.rafId);
-        $('countdown').textContent      = '00:00';
-        $('progressBar').style.width    = '100%';
-        $('totalRemaining').textContent = '00:00';
-        $('rpmValueNext').textContent   = '--';
-        $('rpmLevelNext').textContent   = '-';
         playLongBeep();
         releaseWakeLock();
-        showToast('Downlink complete', 4000);
+        setBodyLevel(null);
+        showSummaryPage(timerState.config, timerState.totalSec);
     }
 
     function cancelTimer() {
@@ -1071,6 +1151,7 @@
     if (location.protocol === 'file:') {
         setOfflineStatus('not available (page opened via file://). Host over HTTPS or http://localhost.', 'warn');
     } else if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js')
                 .then(() => setOfflineStatus('ready (service worker active).', 'ok'))
