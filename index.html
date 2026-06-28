@@ -249,6 +249,22 @@
             text-align: center;
             padding-top: 8px;
         }
+        .downlink-name-line {
+            font-size: 17px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 2px;
+            padding: 0 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .waveform-canvas {
+            width: 100%;
+            height: 56px;
+            display: block;
+            margin: 4px 0 16px;
+        }
         .pc-line {
             font-size: 13px;
             color: rgba(255,255,255,0.85);
@@ -304,6 +320,33 @@
         }
         .timer-actions { display: flex; gap: 10px; }
         .timer-actions .btn { flex: 1; }
+
+        /* Hold-to-cancel and hold-to-skip buttons */
+        #cancelBtn, #skipBtn {
+            position: relative;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+        .cancel-fill {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 0%;
+            background: var(--danger);
+            opacity: 0.72;
+            pointer-events: none;
+        }
+        .skip-fill {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 0%;
+            background: #ffb547;
+            opacity: 0.80;
+            pointer-events: none;
+        }
+        #cancelLabel, #skipLabel { position: relative; z-index: 1; }
+        #skipBtn { display: none; }
 
         /* Summary page */
         #summaryPage { display: none; padding-top: 8px; }
@@ -473,6 +516,27 @@
         }
         .offline-status .ok { color: var(--ok); }
         .offline-status .warn { color: #ffb547; }
+
+        /* Screen-flash visual alerts (supplement for iOS silent mode) */
+        @keyframes flash-beep {
+            0%   { opacity: 0.45; }
+            100% { opacity: 0; }
+        }
+        @keyframes flash-long-beep {
+            0%   { opacity: 0.70; }
+            100% { opacity: 0; }
+        }
+        .flash-overlay {
+            position: fixed;
+            inset: 0;
+            background: #fff;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 500;
+            will-change: opacity;
+        }
+        .flash-overlay.beep      { animation: flash-beep      0.55s ease-out forwards; }
+        .flash-overlay.long-beep { animation: flash-long-beep 0.45s ease-out forwards; }
     </style>
 </head>
 <body>
@@ -513,18 +577,6 @@
                     </div>
                 </div>
 
-                <div class="field" style="margin-bottom:0;">
-                    <div class="switch-row">
-                        <div class="label-wrap">
-                            <label for="quietPeriod">Quiet period</label>
-                            <button type="button" id="quietInfo" class="info-btn" aria-label="More information">i</button>
-                        </div>
-                        <label class="switch">
-                            <input id="quietPeriod" type="checkbox" checked />
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
             </div>
 
             <button id="selectDownlinkBtn" class="btn">Select Downlink</button>
@@ -535,14 +587,23 @@
 
         <!-- Timer page -->
         <section id="timerPage">
+            <div class="downlink-name-line" id="downlinkNameLine"></div>
             <div class="pc-line" id="pcLine">Precursor: - · Command: -</div>
             <div class="countdown" id="countdown">00:00</div>
             <div class="rpm-line">Now: <span id="rpmValue">--</span> <span class="lvl">(<span id="rpmLevel">-</span>)</span></div>
             <div class="rpm-line next">Next: <span id="rpmValueNext">--</span> <span class="lvl">(<span id="rpmLevelNext">-</span>)</span></div>
             <div class="total-line">Total remaining: <span id="totalRemaining">--:--</span></div>
             <div class="progress"><div id="progressBar"></div></div>
+            <canvas id="waveformCanvas" class="waveform-canvas"></canvas>
             <div class="timer-actions">
-                <button id="cancelBtn" class="btn secondary">Cancel</button>
+                <button id="skipBtn" class="btn secondary">
+                    <span class="skip-fill" id="skipFill"></span>
+                    <span id="skipLabel">Hold to skip quiet</span>
+                </button>
+                <button id="cancelBtn" class="btn secondary">
+                    <span class="cancel-fill" id="cancelFill"></span>
+                    <span id="cancelLabel">Hold to cancel</span>
+                </button>
             </div>
         </section>
 
@@ -604,6 +665,7 @@
         </div>
     </div>
 
+    <div id="flashOverlay" class="flash-overlay" aria-hidden="true"></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script>
@@ -721,6 +783,22 @@
         return events;
     }
 
+    // Merge consecutive segments with the same level so the timer shows the
+    // combined duration (e.g. 9s L + 9s L → one 18s L phase).
+    function mergeTimeline(events) {
+        if (!events.length) return [];
+        const out = [Object.assign({}, events[0])];
+        for (let i = 1; i < events.length; i++) {
+            const last = out[out.length - 1];
+            if (events[i].level === last.level) {
+                last.duration += events[i].duration;
+            } else {
+                out.push(Object.assign({}, events[i]));
+            }
+        }
+        return out;
+    }
+
     // ----- DOM helpers -----
     const $ = (id) => document.getElementById(id);
     const mainPage    = $('mainPage');
@@ -769,10 +847,6 @@
     $('installClose').addEventListener('click', () => {
         $('installBanner').style.display = 'none';
         sessionStorage.setItem('install_banner_dismissed', '1');
-    });
-
-    $('quietInfo').addEventListener('click', () => {
-        showToast('Enable this to add 3 minute high signal before beginning the downlink. Disable if the rpm is already high for last 3 minutes', 5000);
     });
 
     // ----- Selected command state -----
@@ -913,7 +987,7 @@
         const rpmHighRaw = $('rpmHigh').value.trim();
         const rpmLow     = rpmLowRaw  === '' ? 120 : parseInt(rpmLowRaw,  10);
         const rpmHigh    = rpmHighRaw === '' ? 240 : parseInt(rpmHighRaw, 10);
-        const quietPeriod = $('quietPeriod').checked;
+        const quietPeriod = true; // always enabled; skip via the hold button on the timer page
 
         let precursor, command;
         if (isCustom()) {
@@ -936,7 +1010,7 @@
         if (s.bitPeriod)  $('bitPeriod').value = String(s.bitPeriod);
         if (s.rpmLow  != null) $('rpmLow').value  = s.rpmLow;
         if (s.rpmHigh != null) $('rpmHigh').value = s.rpmHigh;
-        if (typeof s.quietPeriod === 'boolean') $('quietPeriod').checked = s.quietPeriod;
+        // quietPeriod is always enabled; no saved setting needed
         if (typeof s.selectedIdx === 'number' && s.selectedIdx >= 0 && s.selectedIdx < DOWNLINK_COMMANDS.length) {
             selectedIdx = s.selectedIdx;
             if (isCustom() && s.precursor != null && s.command != null) {
@@ -953,8 +1027,127 @@
 
     $('selectDownlinkBtn').addEventListener('click', showSelectPage);
     $('backToMainBtn').addEventListener('click', showMainPage);
-    $('cancelBtn').addEventListener('click', cancelTimer);
+    // Skip-quiet-period button: active for the first 2 min 45 s of the downlink.
+    const SKIP_QUIET_WINDOW = 165; // seconds — after this the button is hidden
+
+    let skipPressStart = null;
+    let skipPressRaf   = null;
+    let skipMode       = 'quiet'; // 'quiet' | 'tail'
+
+    function startSkipHold(e) {
+        if (!timerState.running) return;
+        e.preventDefault();
+        skipPressStart = performance.now();
+        stepSkipFill();
+    }
+
+    function stepSkipFill() {
+        if (!skipPressStart) return;
+        const elapsed  = performance.now() - skipPressStart;
+        const pct      = Math.min(100, (elapsed / CANCEL_HOLD_MS) * 100);
+        $('skipFill').style.width = pct + '%';
+        const secsLeft = Math.ceil((CANCEL_HOLD_MS - elapsed) / 1000);
+        $('skipLabel').textContent = secsLeft > 0 ? 'Skipping… ' + secsLeft : 'Skipping…';
+        if (pct >= 100) {
+            const mode = skipMode;
+            resetSkipHold(false);
+            if (mode === 'tail') { finishTimer(); } else { skipQuietPeriod(); }
+            return;
+        }
+        skipPressRaf = requestAnimationFrame(stepSkipFill);
+    }
+
+    function resetSkipHold(animate) {
+        skipPressStart = null;
+        if (skipPressRaf) { cancelAnimationFrame(skipPressRaf); skipPressRaf = null; }
+        $('skipLabel').textContent = skipMode === 'tail' ? 'Hold to complete' : 'Hold to skip quiet';
+        const fill = $('skipFill');
+        if (animate) {
+            fill.style.transition = 'width 0.25s ease-out';
+            fill.style.width = '0%';
+            setTimeout(() => { fill.style.transition = ''; }, 260);
+        } else {
+            fill.style.transition = '';
+            fill.style.width = '0%';
+        }
+    }
+
+    function skipQuietPeriod() {
+        // Jump elapsed time to the end of the quiet period so the next tick()
+        // immediately enters the first waveform phase.
+        const quietEnd = timerState.quietPeriodEnd; // 180 s
+        timerState.startMs = performance.now() - quietEnd * 1000;
+        $('skipBtn').style.display = 'none';
+    }
+
+    const skipBtn = $('skipBtn');
+    skipBtn.addEventListener('pointerdown',   startSkipHold);
+    skipBtn.addEventListener('pointerup',     () => { if (skipPressStart) resetSkipHold(true); });
+    skipBtn.addEventListener('pointercancel', () => { if (skipPressStart) resetSkipHold(true); });
+    skipBtn.addEventListener('pointerleave',  () => { if (skipPressStart) resetSkipHold(true); });
+
+    // Hold-to-cancel: user must press for 3 s; releasing early resets the fill.
+    const CANCEL_HOLD_MS = 3000;
+    let cancelPressStart = null;
+    let cancelPressRaf   = null;
+
+    function startCancelHold(e) {
+        if (!timerState.running) return;
+        e.preventDefault();          // suppress the native click that follows touch
+        cancelPressStart = performance.now();
+        stepCancelFill();
+    }
+
+    function stepCancelFill() {
+        if (!cancelPressStart) return;
+        const elapsed = performance.now() - cancelPressStart;
+        const pct     = Math.min(100, (elapsed / CANCEL_HOLD_MS) * 100);
+        $('cancelFill').style.width = pct + '%';
+        const secsLeft = Math.ceil((CANCEL_HOLD_MS - elapsed) / 1000);
+        $('cancelLabel').textContent = secsLeft > 0 ? 'Cancelling… ' + secsLeft : 'Cancelling…';
+        if (pct >= 100) {
+            resetCancelHold(false);
+            cancelTimer();
+            return;
+        }
+        cancelPressRaf = requestAnimationFrame(stepCancelFill);
+    }
+
+    function resetCancelHold(animate) {
+        cancelPressStart = null;
+        if (cancelPressRaf) { cancelAnimationFrame(cancelPressRaf); cancelPressRaf = null; }
+        $('cancelLabel').textContent = 'Hold to cancel';
+        const fill = $('cancelFill');
+        if (animate) {
+            fill.style.transition = 'width 0.25s ease-out';
+            fill.style.width = '0%';
+            // Clear transition after it completes so future animation frame updates are instant
+            setTimeout(() => { fill.style.transition = ''; }, 260);
+        } else {
+            fill.style.transition = '';
+            fill.style.width = '0%';
+        }
+    }
+
+    const cancelBtn = $('cancelBtn');
+    cancelBtn.addEventListener('pointerdown',   startCancelHold);
+    cancelBtn.addEventListener('pointerup',     () => { if (cancelPressStart) resetCancelHold(true); });
+    cancelBtn.addEventListener('pointercancel', () => { if (cancelPressStart) resetCancelHold(true); });
+    cancelBtn.addEventListener('pointerleave',  () => { if (cancelPressStart) resetCancelHold(true); });
     $('newDownlinkBtn').addEventListener('click', showMainPage);
+
+    function warnSilentModeOnce() {
+        // The iOS hardware mute switch silences all web audio; there is no API to
+        // bypass it, so we warn once per session so the user can act before the
+        // downlink starts.
+        if (sessionStorage.getItem('silent_warn_shown') === '1') return;
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (!isIOS) return;
+        sessionStorage.setItem('silent_warn_shown', '1');
+        showToast('🔕 Make sure the mute switch is OFF — silent mode disables audio alerts on iPhone.', 6000);
+    }
 
     $('startBtn').addEventListener('click', async () => {
         const cfg = readConfig();
@@ -962,6 +1155,7 @@
         saveSettings(cfg);
         ensureAudio();
         if (!audioBuffers.beep || !audioBuffers.longBeep) await preloadAudio();
+        warnSilentModeOnce();
         startTimer(cfg);
         showTimerPage();
     });
@@ -994,12 +1188,12 @@
     async function preloadAudio() {
         ensureAudio();
         if (audioCtx) {
-            const [b, lb] = await Promise.all([loadAudioBuffer('beep.mp3'), loadAudioBuffer('long_beep.mp3')]);
+            const [b, lb] = await Promise.all([loadAudioBuffer('beep_regular.wav'), loadAudioBuffer('beep_final.wav')]);
             audioBuffers.beep = b; audioBuffers.longBeep = lb;
         }
         try {
-            audioFallback.beep = new Audio('beep.mp3');
-            audioFallback.longBeep = new Audio('long_beep.mp3');
+            audioFallback.beep = new Audio('beep_regular.wav');
+            audioFallback.longBeep = new Audio('beep_final.wav');
             audioFallback.beep.preload = 'auto';
             audioFallback.longBeep.preload = 'auto';
         } catch (_) {}
@@ -1022,8 +1216,17 @@
         if (fb) { try { const n = fb.cloneNode(true); n.volume = volume; n.play().catch(() => {}); } catch (_) {} }
     }
 
-    function playBeep()     { playSample('beep',     1.0); }
-    function playLongBeep() { playSample('longBeep', 1.0); }
+    function triggerFlash(type) {
+        const el = $('flashOverlay');
+        // Remove class and force reflow so the animation restarts even if called
+        // in rapid succession (e.g. three beeps at 3 s / 2 s / 1 s).
+        el.className = 'flash-overlay';
+        void el.offsetWidth;
+        el.className = 'flash-overlay ' + type;
+    }
+
+    function playBeep()     { playSample('beep',     1.0); triggerFlash('beep'); }
+    function playLongBeep() { playSample('longBeep', 1.0); triggerFlash('long-beep'); }
 
     // ----- Wake lock -----
     let wakeLock = null;
@@ -1041,7 +1244,8 @@
     // ----- Timer engine -----
     const timerState = {
         running: false, rafId: null, startMs: 0, totalSec: 0,
-        boundaries: [], lastBeepKey: '', currentIndex: -1, config: null
+        boundaries: [], lastBeepKey: '', currentIndex: -1, config: null,
+        quietPeriodEnd: 0   // seconds; 0 means no quiet period (unused now, always 180)
     };
 
     function fmtTime(seconds) {
@@ -1056,24 +1260,39 @@
     }
 
     function startTimer(config) {
-        const events   = buildTimeline(config);
+        const rawEvents = buildTimeline(config);
+        // Capture the quiet-period duration BEFORE merging. All precursors start
+        // with a HIGH bit, so mergeTimeline folds the 180 s quiet-period HIGH and
+        // the first waveform HIGH into one phase (e.g. 198 s at bit period 36).
+        // We want skip to jump to exactly 180 s — the end of the quiet period —
+        // so the first waveform bit still plays out (shows 18 s, 9 s, etc.).
+        const quietPeriodEnd = rawEvents.length > 0 ? rawEvents[0].duration : 0;
+        const events   = mergeTimeline(rawEvents);
         const totalSec = events.reduce((a, b) => a + b.duration, 0);
         const boundaries = [];
         let acc = 0;
         for (const e of events) { boundaries.push({ start: acc, end: acc + e.duration, ev: e }); acc += e.duration; }
 
-        timerState.running      = true;
-        timerState.startMs      = performance.now();
-        timerState.totalSec     = totalSec;
-        timerState.boundaries   = boundaries;
-        timerState.lastBeepKey  = '';
-        timerState.currentIndex = -1;
-        timerState.config       = config;
+        timerState.running         = true;
+        timerState.startMs         = performance.now();
+        timerState.totalSec        = totalSec;
+        timerState.boundaries      = boundaries;
+        timerState.lastBeepKey     = '';
+        timerState.currentIndex    = -1;
+        timerState.config          = config;
+        timerState.quietPeriodEnd  = quietPeriodEnd;
 
+        const cmd = DOWNLINK_COMMANDS[config.selectedIdx];
+        $('downlinkNameLine').textContent = cmd ? cmd.label : 'Custom Downlink';
         $('pcLine').textContent =
-            'Precursor: ' + config.precursor + ' · Command: ' + config.command +
-            ' · Bit period: ' + config.bitPeriod + 's' +
-            (config.quietPeriod ? ' · Quiet on' : '');
+            'P' + config.precursor + ' · C' + config.command +
+            ' · ' + config.bitPeriod + 's · Quiet on';
+
+        // Show skip button (quiet mode) and ensure cancel is visible.
+        skipMode = 'quiet';
+        resetSkipHold(false);
+        $('skipBtn').style.display  = 'block';
+        $('cancelBtn').style.display = '';
 
         requestWakeLock();
         tick();
@@ -1102,6 +1321,30 @@
         $('totalRemaining').textContent = fmtTime(totalRemaining);
         $('progressBar').style.width  = Math.min(100, (elapsedSec / totalSec) * 100) + '%';
 
+        // --- Button visibility: three distinct zones ---
+        // Zone 1 (elapsedSec < SKIP_QUIET_WINDOW): skip(quiet) + cancel both visible — set up in startTimer()
+        // Zone 2 (middle): skip hidden, cancel visible
+        // Zone 3 (totalRemaining <= 90 — last 90 s): skip(tail) visible, cancel hidden
+        const skipBtnEl   = $('skipBtn');
+        const cancelBtnEl = $('cancelBtn');
+        if (totalRemaining <= 90) {
+            if (skipMode !== 'tail') {
+                // Entering tail zone: switch skip button to "complete" mode.
+                if (skipPressStart) resetSkipHold(true);
+                skipMode = 'tail';
+                $('skipLabel').textContent  = 'Hold to complete';
+                skipBtnEl.style.display   = 'block';
+                cancelBtnEl.style.display = 'none';
+            }
+        } else if (elapsedSec >= SKIP_QUIET_WINDOW) {
+            // Middle zone: quiet window has passed but tail not yet reached.
+            if (skipBtnEl.style.display !== 'none') {
+                if (skipPressStart) resetSkipHold(true);
+                skipBtnEl.style.display = 'none';
+            }
+            cancelBtnEl.style.display = '';
+        }
+
         if (idx !== timerState.currentIndex) {
             if (timerState.currentIndex !== -1 && elapsedSec < totalSec) playLongBeep();
             timerState.currentIndex = idx;
@@ -1114,8 +1357,97 @@
             if (timerState.lastBeepKey !== key) { timerState.lastBeepKey = key; playBeep(); }
         }
 
+        drawWaveform(elapsedSec);
+
         if (elapsedSec >= totalSec) { finishTimer(); return; }
         timerState.rafId = requestAnimationFrame(tick);
+    }
+
+    function drawWaveform(elapsedSec) {
+        const canvas = $('waveformCanvas');
+        if (!canvas) return;
+        const dpr      = window.devicePixelRatio || 1;
+        const displayW = canvas.clientWidth;
+        const displayH = canvas.clientHeight;
+        if (displayW === 0) return;
+        // Resize backing store to match display size (also handles orientation change)
+        const bsW = Math.round(displayW * dpr);
+        const bsH = Math.round(displayH * dpr);
+        if (canvas.width !== bsW || canvas.height !== bsH) {
+            canvas.width  = bsW;
+            canvas.height = bsH;
+        }
+        const ctx        = canvas.getContext('2d');
+        const W          = canvas.width;
+        const H          = canvas.height;
+        const boundaries = timerState.boundaries;
+        const totalSec   = timerState.totalSec;
+        ctx.clearRect(0, 0, W, H);
+        if (!boundaries.length || totalSec <= 0) return;
+
+        const yH = Math.round(H * 0.22);   // y coord for HIGH level (near top)
+        const yL = Math.round(H * 0.78);   // y coord for LOW level (near bottom)
+        const lw = 2.5 * dpr;
+        const t2x = (t) => Math.round((t / totalSec) * W);
+
+        const colorDone  = 'rgba(255,255,255,0.82)';
+        const colorAhead = 'rgba(255,255,255,0.20)';
+
+        for (let i = 0; i < boundaries.length; i++) {
+            const b  = boundaries[i];
+            const y  = b.ev.level === 'H' ? yH : yL;
+            const x0 = t2x(b.start);
+            const x1 = t2x(b.end);
+
+            // Vertical transition from previous level at the segment boundary
+            if (i > 0) {
+                const yPrev = boundaries[i - 1].ev.level === 'H' ? yH : yL;
+                if (yPrev !== y) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = b.start < elapsedSec ? colorDone : colorAhead;
+                    ctx.lineWidth   = lw;
+                    ctx.lineCap     = 'round';
+                    ctx.moveTo(x0, yPrev);
+                    ctx.lineTo(x0, y);
+                    ctx.stroke();
+                }
+            }
+
+            // Elapsed portion of horizontal segment (bright)
+            if (elapsedSec > b.start) {
+                const xMid = t2x(Math.min(elapsedSec, b.end));
+                ctx.beginPath();
+                ctx.strokeStyle = colorDone;
+                ctx.lineWidth   = lw;
+                ctx.lineCap     = 'square';
+                ctx.moveTo(x0, y);
+                ctx.lineTo(xMid, y);
+                ctx.stroke();
+            }
+
+            // Remaining portion of horizontal segment (dim)
+            if (elapsedSec < b.end) {
+                const xFrom = elapsedSec > b.start ? t2x(elapsedSec) : x0;
+                ctx.beginPath();
+                ctx.strokeStyle = colorAhead;
+                ctx.lineWidth   = lw;
+                ctx.lineCap     = 'square';
+                ctx.moveTo(xFrom, y);
+                ctx.lineTo(x1, y);
+                ctx.stroke();
+            }
+        }
+
+        // Playhead — vertical dashed line at current elapsed position
+        const xNow = t2x(Math.min(elapsedSec, totalSec));
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth   = 1.5 * dpr;
+        ctx.setLineDash([4 * dpr, 4 * dpr]);
+        ctx.moveTo(xNow, 0);
+        ctx.lineTo(xNow, H);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 
     function finishTimer() {
@@ -1132,6 +1464,7 @@
         if (timerState.rafId) cancelAnimationFrame(timerState.rafId);
         releaseWakeLock();
         setBodyLevel(null);
+        $('skipBtn').style.display = 'none';
         showMainPage();
     }
 
