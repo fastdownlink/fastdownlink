@@ -8,8 +8,8 @@ const PRECACHE_URLS = [
     './icon-180.png',
     './icon-192.png',
     './icon-512.png',
-    './beep.mp3',
-    './long_beep.mp3'
+    './beep_regular.wav',
+    './beep_final.wav'
 ];
 
 self.addEventListener('install', (event) => {
